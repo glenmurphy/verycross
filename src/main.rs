@@ -32,11 +32,13 @@ fn make_overlay(window: &Window) {
             0 => panic!("GetWindowLongPtrW returned 0"),
             ptr => ptr,
         };
-        SetWindowLongPtrW(
+        if SetWindowLongPtrW(
             hwnd,
             GWL_EXSTYLE,
             window_styles | WS_EX_TRANSPARENT as isize | WS_EX_LAYERED as isize | WS_EX_TOOLWINDOW as isize,
-        );
+        ) == 0 {
+            panic!("SetWindowLongPtrW returned 0");
+        };
     }
 }
 
@@ -96,6 +98,15 @@ fn load_image(bytes: &[u8]) -> Image {
     }
 }
 
+fn show_window(window: &Window) {
+    window.set_visible(true);
+    make_overlay(&window);
+}
+
+fn hide_window(window: &Window) {
+    window.set_visible(false);
+}
+
 #[derive(Debug, Clone, Copy)]
 enum WindowControl {
     Show,
@@ -116,28 +127,27 @@ async fn main() {
     let window = WindowBuilder::new()
         .with_owner_window(core.hwnd() as _)
         .with_inner_size(LogicalSize::new(crosshair.width as u32, crosshair.height as u32))
-        .with_visible(true)
         .with_decorations(false)
         .with_transparent(true)
+        .with_visible(false)
         .with_always_on_top(true)
         .build(&event_loop)
         .unwrap();
     window.set_enable(false);
-
+    
     center_window(&window);
-    make_overlay(&window);
+    show_window(&window);
 
     let proxy = event_loop.create_proxy();
     let mut tray = tray::start();    
+    let mut key_rx = keyboard::listen();
     tokio::spawn(async move {
-        let mut key_rx = keyboard::listen();
         let mut showing = true;
-
         loop {
             tokio::select! {
                 Some((code, down)) = key_rx.recv() => {
                     println!("key: {}, {}", code, down);
-                    if code == Key::F10 as u32 && down{
+                    if code == Key::F10 as u32 && down {
                         if showing {
                             proxy.send_event(WindowControl::Hide).unwrap();
                             tray.off();
@@ -179,10 +189,10 @@ async fn main() {
 
         match event {
             Event::UserEvent( WindowControl::Show ) => {
-                window.set_visible(true);
+                show_window(&window);
             },
             Event::UserEvent( WindowControl::Hide ) => {
-                window.set_visible(false);
+                hide_window(&window);
             },
             Event::UserEvent( WindowControl::Quit ) => {
                 *control_flow = ControlFlow::Exit;
