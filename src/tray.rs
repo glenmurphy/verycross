@@ -61,10 +61,12 @@ impl Tray {
         tray.add_menu_item("Show", move || {
             let _ = show_tx.send(TrayMessage::Show);
         }).unwrap();
+
         let hide_tx = self.tray_tx.clone();
         tray.add_menu_item("Hide", move || {
             let _ = hide_tx.send(TrayMessage::Hide);
         }).unwrap();
+        
         let quit_tx = self.tray_tx.clone();
         tray.add_menu_item("Quit", move || {
             let _ = quit_tx.send(TrayMessage::Quit);
@@ -72,12 +74,8 @@ impl Tray {
 
         while let Some(v) = self.control_rx.recv().await {
             match v {
-                TrayControl::On => {
-                    tray.set_icon("tray-on").unwrap();
-                }
-                TrayControl::Off => {
-                    tray.set_icon("tray-off").unwrap();
-                }
+                TrayControl::On => tray.set_icon("tray-on").unwrap(),
+                TrayControl::Off => tray.set_icon("tray-off").unwrap(),
                 TrayControl::Quit => {
                     let _ = tray.inner_mut().quit();
                     let _ = tray.inner_mut().shutdown();
