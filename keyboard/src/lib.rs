@@ -1,8 +1,7 @@
 // We have to make our own keyboard system because the existing systems use
 // SendInput using the vk codes, whereas games need SendInput with keyboard
 // scancodes
-use std::{io::Error, sync::mpsc::{Receiver, self}};
-use winapi::{shared::{windef::{HWND, POINT}, minwindef::{UINT, WPARAM, LPARAM, DWORD}}};
+use std::{io::Error};
 use winapi::um::winuser::*;
 mod listener;
 

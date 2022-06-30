@@ -66,7 +66,7 @@ impl Tray {
         tray.add_menu_item("Hide", move || {
             let _ = hide_tx.send(TrayMessage::Hide);
         }).unwrap();
-        
+
         let quit_tx = self.tray_tx.clone();
         tray.add_menu_item("Quit", move || {
             let _ = quit_tx.send(TrayMessage::Quit);
@@ -81,7 +81,6 @@ impl Tray {
                     let _ = tray.inner_mut().shutdown();
                     break;
                 }
-                _ => {}
             }
         }
     }
