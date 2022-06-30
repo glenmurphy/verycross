@@ -10,6 +10,7 @@ use winit::{
     window::WindowBuilder, window::Window, platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     dpi::{LogicalSize, PhysicalPosition},
 };
+use winapi::um::winuser::{GetForegroundWindow, SetForegroundWindow};
 use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
 use keyboard::Key;
 
@@ -116,6 +117,9 @@ enum WindowControl {
 
 #[tokio::main]
 async fn main() {
+    // Get firegro
+    let previous_focus = unsafe { GetForegroundWindow() };
+
     let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
 
     let event_loop = EventLoop::<WindowControl>::with_user_event();
@@ -146,7 +150,6 @@ async fn main() {
         loop {
             tokio::select! {
                 Some((code, down)) = key_rx.recv() => {
-                    println!("key: {}, {}", code, down);
                     if code == Key::F10 as u32 && down {
                         if showing {
                             proxy.send_event(WindowControl::Hide).unwrap();
@@ -183,7 +186,9 @@ async fn main() {
         }
     });
 
-    
+    // Restore focus to the previously focused window
+    unsafe { SetForegroundWindow(previous_focus); }
+
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
