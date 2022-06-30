@@ -13,6 +13,7 @@ tray-item = "0.7.0"
 winit-blit = { git = "https://github.com/rust-windowing/winit-blit" }
 keyboard = { path = './keyboard/' }
 png = "0.17.5"
+single-instance = "0.1.1"
 
 [build-dependencies]
 [target.'cfg(windows)'.build-dependencies]

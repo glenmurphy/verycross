@@ -13,6 +13,7 @@ use winit::{
 use winapi::um::winuser::{GetForegroundWindow, SetForegroundWindow};
 use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
 use keyboard::Key;
+use single_instance::SingleInstance;
 
 mod tray;
 
@@ -108,6 +109,21 @@ fn hide_window(window: &Window) {
     window.set_visible(false);
 }
 
+fn error_dialog(message: &str) {
+    println!("Showing error: {}", message);
+    use std::ffi::CString;
+    let lp_text = CString::new(message).unwrap();
+    let lp_caption = CString::new("Error").unwrap();
+    unsafe {
+        winapi::um::winuser::MessageBoxA(
+            GetForegroundWindow(),
+            lp_text.as_ptr(),
+            lp_caption.as_ptr(),
+            0,
+        );
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum WindowControl {
     Show,
@@ -117,6 +133,12 @@ enum WindowControl {
 
 #[tokio::main]
 async fn main() {
+    let instance = SingleInstance::new("verycross").unwrap();
+    if !instance.is_single() {
+        error_dialog("Verycross is already running");
+        return;
+    }
+
     // Get firegro
     let previous_focus = unsafe { GetForegroundWindow() };
 
