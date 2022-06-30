@@ -1,3 +1,3 @@
-id        ICON "./ico/verycross.ico"
-tray-off  ICON "./ico/tray-off.ico"
-tray-on   ICON "./ico/tray-on.ico"
+id        ICON "./assets/verycross.ico"
+tray-off  ICON "./assets/tray-off.ico"
+tray-on   ICON "./assets/tray-on.ico"

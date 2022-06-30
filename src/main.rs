@@ -10,7 +10,7 @@ use winit::{
     window::WindowBuilder, window::Window, platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     dpi::{LogicalSize, PhysicalPosition},
 };
-use winit_blit::{NativeFormat, PixelBufferTyped};
+use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
 use keyboard::Key;
 
 mod tray;
@@ -48,21 +48,52 @@ fn center_window(window: &Window) {
     window.set_outer_position(PhysicalPosition::new(x, y));
 }
 
-fn fill_window(window: &Window) {
-    // For better drawing/PNG loading, see the example code linked at:
-    // https://github.com/rust-windowing/winit/issues/2109
+struct Image {
+    width: usize,
+    height: usize,
+    buffer: Vec<BGRA>,
+}
+
+fn fill_window(image: &Image, window: &Window) {
     let (width, height): (u32, u32) = window.inner_size().into();
     let mut buffer =
         PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
 
-    let green = NativeFormat::new(0, 255, 0, 127);
-    for (_, row) in buffer.rows_mut().enumerate() {
-        for (_, pixel) in row.into_iter().enumerate() {
-            *pixel = green;
+    for (y, row) in buffer.rows_mut().enumerate() {
+        for (x, pixel) in row.into_iter().enumerate() {
+            *pixel = image.buffer[(y * width as usize + x)];
         }
     }
 
     buffer.blit(&window).unwrap();
+}
+
+fn load_image(bytes: &[u8]) -> Image {
+    let decoder = png::Decoder::new(bytes);
+
+    let mut reader = decoder.read_info().unwrap();
+    let mut png_buffer = vec![0; reader.output_buffer_size()];
+    reader.next_frame(&mut png_buffer).unwrap();
+
+    let width = reader.info().width as usize;
+    let height = reader.info().height as usize;
+
+    let mut buffer: Vec<BGRA> = vec![BGRA { b: 0, g : 255, r : 0, a : 255}; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let i = (y * width + x) * 4;
+            let r = png_buffer[i + 0];
+            let g = png_buffer[i + 1];
+            let b = png_buffer[i + 2];
+            let a = png_buffer[i + 3];
+
+            buffer[y * width + x] = NativeFormat::new(b, g, r, a);
+        }
+    }
+
+    Image {
+        width, height, buffer
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -74,8 +105,7 @@ enum WindowControl {
 
 #[tokio::main]
 async fn main() {
-    let width: u32 = 2;
-    let height: u32 = 2;
+    let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
 
     let event_loop = EventLoop::<WindowControl>::with_user_event();
 
@@ -85,7 +115,7 @@ async fn main() {
         .unwrap();
     let window = WindowBuilder::new()
         .with_owner_window(core.hwnd() as _)
-        .with_inner_size(LogicalSize::new(width, height))
+        .with_inner_size(LogicalSize::new(crosshair.width as u32, crosshair.height as u32))
         .with_visible(true)
         .with_decorations(false)
         .with_transparent(true)
@@ -143,6 +173,7 @@ async fn main() {
         }
     });
 
+    
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -160,7 +191,8 @@ async fn main() {
                 *control_flow = ControlFlow::Exit;
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                fill_window(&window);
+                println!("redraw");
+                fill_window(&crosshair, &window);
             },
             Event::WindowEvent { window_id, event: WindowEvent::ScaleFactorChanged {..} } if window_id == window.id() => {
                 center_window(&window);
