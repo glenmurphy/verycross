@@ -1,8 +1,8 @@
 # Verycross
 
-A hotkey/tray based software crosshair for Windows. Only works for games that don't run in exclusive mode (e.g. you might need to run your game in fullscreen-windowed mode).
+A hotkey/tray based software crosshair for Windows.
 
-Toggle visibility using F10 or the tray icon
+Toggle visibility using F10 or the tray icon.
 
 Here is a screenshot to marvel at:
 
