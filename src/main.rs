@@ -96,12 +96,12 @@ fn load_image(bytes: &[u8]) -> Image {
     let width = reader.info().width as usize;
     let height = reader.info().height as usize;
 
-    let mut buffer: Vec<BGRA> = vec![NativeFormat::new(0, 0, 0, 0); width * height];
+    let mut buffer: Vec<BGRA> = vec![BGRA { b : 0, g : 0, r : 0, a : 0 }; width * height];
     for y in 0..height {
         for x in 0..width {
             let i = (y * width + x) * 4;
             let (r, g, b, a) = (buf[i + 0], buf[i + 1], buf[i + 2], buf[i + 3]);
-            buffer[y * width + x] = NativeFormat::new(b, g, r, a);
+            buffer[y * width + x] = BGRA { b, g, r, a };
         }
     }
 
