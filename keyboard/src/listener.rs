@@ -27,7 +27,6 @@ fn setup_hook() -> HHOOK {
         if hook.is_null() {
             panic!("Windows hook null return");
         }
-        println!("Successfully hooked keyboard");
         hook
     }
 }
@@ -38,7 +37,6 @@ fn remove_hook(hook: HHOOK) {
         if result == 0 {
             panic!("Windows unhook non-zero return");
         }
-        println!("Successfully unhooked keyboard");
     }
 }
 

@@ -53,24 +53,26 @@ pub struct Tray {
 impl Tray {
     #[cfg(target_os = "windows")]
     async fn run_win(&mut self) {
-        println!("starting windows tray");
         let mut tray = TrayItem::new("Verycross", "tray-on").unwrap();
         tray.add_label("Verycross").unwrap();
 
         let show_tx = self.tray_tx.clone();
         tray.add_menu_item("Show", move || {
             let _ = show_tx.send(TrayMessage::Show);
-        }).unwrap();
+        })
+        .unwrap();
 
         let hide_tx = self.tray_tx.clone();
         tray.add_menu_item("Hide", move || {
             let _ = hide_tx.send(TrayMessage::Hide);
-        }).unwrap();
+        })
+        .unwrap();
 
         let quit_tx = self.tray_tx.clone();
         tray.add_menu_item("Quit", move || {
             let _ = quit_tx.send(TrayMessage::Quit);
-        }).unwrap();
+        })
+        .unwrap();
 
         while let Some(v) = self.control_rx.recv().await {
             match v {
@@ -112,7 +114,10 @@ impl Tray {
                 tray_tx,
                 control_rx,
             },
-            TrayInterface { control_tx, tray_rx },
+            TrayInterface {
+                control_tx,
+                tray_rx,
+            },
         )
     }
 
