@@ -86,19 +86,6 @@ fn fill_window(image: &Image, window: &Window) {
     buffer.blit(&window).unwrap();
 }
 
-fn clear_window(window: &Window) {
-    let (width, height): (u32, u32) = window.inner_size().into();
-    let mut buffer = PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
-
-    for (_y, row) in buffer.rows_mut().enumerate() {
-        for (_x, pixel) in row.into_iter().enumerate() {
-            *pixel = BGRA { r : 0, g : 0, b : 0, a : 0 };
-        }
-    }
-
-    buffer.blit(&window).unwrap();
-}
-
 fn load_image(bytes: &[u8]) -> Image {
     let decoder = png::Decoder::new(bytes);
 
