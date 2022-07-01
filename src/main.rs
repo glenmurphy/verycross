@@ -76,21 +76,17 @@ fn load_image(bytes: &[u8]) -> Image {
     let decoder = png::Decoder::new(bytes);
 
     let mut reader = decoder.read_info().unwrap();
-    let mut png_buffer = vec![0; reader.output_buffer_size()];
-    reader.next_frame(&mut png_buffer).unwrap();
+    let mut buf = vec![0; reader.output_buffer_size()];
+    reader.next_frame(&mut buf).unwrap();
 
     let width = reader.info().width as usize;
     let height = reader.info().height as usize;
 
-    let mut buffer: Vec<BGRA> = vec![BGRA { b: 0, g : 255, r : 0, a : 255}; width * height];
+    let mut buffer: Vec<BGRA> = vec![NativeFormat::new(0, 0, 0, 0); width * height];
     for y in 0..height {
         for x in 0..width {
             let i = (y * width + x) * 4;
-            let r = png_buffer[i + 0];
-            let g = png_buffer[i + 1];
-            let b = png_buffer[i + 2];
-            let a = png_buffer[i + 3];
-
+            let (r, g, b, a) = (buf[i + 0], buf[i + 1], buf[i + 2], buf[i + 3]);
             buffer[y * width + x] = NativeFormat::new(b, g, r, a);
         }
     }
