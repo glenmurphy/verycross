@@ -1,0 +1,3 @@
+[submodule "winky"]
+	path = winky
+	url = https://github.com/glenmurphy/winky
