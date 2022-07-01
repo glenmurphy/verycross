@@ -13,7 +13,7 @@ winapi = "0.3.9"
 winit-blit = { git = "https://github.com/rust-windowing/winit-blit" }
 png = "0.17.5"
 tray-item = "0.7.0"
-keyboard = { path = './keyboard/' }
+winky = { path = './winky/' }
 
 [build-dependencies]
 [target.'cfg(windows)'.build-dependencies]

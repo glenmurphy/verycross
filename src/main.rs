@@ -4,7 +4,7 @@
     windows_subsystem = "windows"
 )]
 
-use keyboard::Key;
+use winky::Key;
 use single_instance::SingleInstance;
 use winapi::{
     shared::windef::HWND__,
@@ -184,7 +184,7 @@ async fn main() {
     show_window(&window);
 
     let mut tray = tray::start();
-    let mut key_rx = keyboard::listen();
+    let mut key_rx = winky::listen();
     
     let proxy = event_loop.create_proxy();
     tokio::spawn(async move {

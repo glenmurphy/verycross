@@ -722,14 +722,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyboard"
-version = "0.1.0"
-dependencies = [
- "tokio",
- "winapi",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1437,7 +1429,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 name = "verycross"
 version = "0.1.2"
 dependencies = [
- "keyboard",
  "png",
  "single-instance",
  "tokio",
@@ -1446,6 +1437,7 @@ dependencies = [
  "windres",
  "winit",
  "winit-blit",
+ "winky",
 ]
 
 [[package]]
@@ -1711,6 +1703,14 @@ version = "0.0.0"
 source = "git+https://github.com/rust-windowing/winit-blit#17a03190d4682f253739f75c7e94aee7289b3ea3"
 dependencies = [
  "raw-window-handle 0.3.4",
+ "winapi",
+]
+
+[[package]]
+name = "winky"
+version = "0.1.0"
+dependencies = [
+ "tokio",
  "winapi",
 ]
 
