@@ -10,7 +10,9 @@ use winit::{
     window::WindowBuilder, window::Window, platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     dpi::{LogicalSize, PhysicalPosition},
 };
-use winapi::um::winuser::{GetForegroundWindow, SetForegroundWindow};
+use winapi::{
+    shared::windef::HWND__,
+    um::winuser::{GetForegroundWindow, SetForegroundWindow, HWND_TOPMOST, SetWindowPos, GetWindowRect, SWP_NOMOVE, SWP_NOSIZE}, shared::windef::RECT};
 use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
 use keyboard::Key;
 use single_instance::SingleInstance;
@@ -23,7 +25,7 @@ mod tray;
 /// https://github.com/maroider/overlay/blob/1a80a30d6ef8e6b2fe6fa273a2cc2b472a3b2e51/src/os.rs
 fn make_overlay(window: &Window) {
     use winapi::{
-        shared::windef::HWND__,
+        
         um::winuser::{
             GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED, WS_EX_TOOLWINDOW
         },
@@ -41,6 +43,14 @@ fn make_overlay(window: &Window) {
         ) == 0 {
             panic!("SetWindowLongPtrW returned 0");
         };
+    }
+    set_topmost(window);
+}
+
+fn set_topmost(window: &Window) {
+    unsafe {
+        let hwnd = window.hwnd() as *mut HWND__;
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
     }
 }
 
@@ -124,6 +134,7 @@ fn error_dialog(message: &str) {
 enum WindowControl {
     Show,
     Hide,
+    Jiggle,
     Quit,
 }
 
@@ -163,10 +174,14 @@ async fn main() {
     let proxy = event_loop.create_proxy();
     let mut tray = tray::start();    
     let mut key_rx = keyboard::listen();
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
     tokio::spawn(async move {
         let mut showing = true;
         loop {
             tokio::select! {
+                _ = interval.tick() => {
+                    proxy.send_event(WindowControl::Jiggle).unwrap();
+                },
                 Some((code, down)) = key_rx.recv() => {
                     if code == Key::F10 as u32 && down {
                         if showing {
@@ -216,6 +231,10 @@ async fn main() {
             },
             Event::UserEvent( WindowControl::Hide ) => {
                 hide_window(&window);
+            },
+            Event::UserEvent( WindowControl::Jiggle ) => {
+                // Sometimes fullscreen apps will put themselves over the window, so this resets that
+                set_topmost(&window);
             },
             Event::UserEvent( WindowControl::Quit ) => {
                 *control_flow = ControlFlow::Exit;
