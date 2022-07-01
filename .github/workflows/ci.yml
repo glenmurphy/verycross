@@ -8,8 +8,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          submodules: true
       - run: cargo build --release --all-features
