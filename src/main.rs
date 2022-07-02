@@ -3,8 +3,9 @@
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
 )]
+mod interface;
+mod tray;
 
-use winky::Key;
 use single_instance::SingleInstance;
 use winapi::{
     shared::windef::HWND__,
@@ -17,14 +18,33 @@ use winapi::{
 use winit::{
     dpi::{LogicalSize, PhysicalPosition},
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     platform::windows::{WindowBuilderExtWindows, WindowExtWindows},
     window::Window,
     window::WindowBuilder,
 };
 use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
+use interface::InterfaceMessage;
 
-mod tray;
+fn create_window(width: u32, height: u32, event_loop: &EventLoop<InterfaceMessage>) -> (Window, Window) {
+    let core = WindowBuilder::new()
+        .with_visible(false)
+        .build(&event_loop)
+        .unwrap();
+    let window = WindowBuilder::new()
+        .with_owner_window(core.hwnd() as _)
+        .with_inner_size(LogicalSize::new(width, height,))
+        .with_decorations(false)
+        .with_transparent(true)
+        .with_visible(true)
+        .with_always_on_top(true)
+        .build(&event_loop)
+        .unwrap();
+    window.set_enable(false);
+    center_window(&window);
+    show_window(&window);
+    (core, window)
+}
 
 /// Makes the window transparent to events
 /// derived from
@@ -68,8 +88,8 @@ fn center_window(window: &Window) {
 }
 
 struct Image {
-    width: usize,
-    height: usize,
+    width: u32,
+    height: u32,
     buffer: Vec<BGRA>,
 }
 
@@ -93,15 +113,16 @@ fn load_image(bytes: &[u8]) -> Image {
     let mut buf = vec![0; reader.output_buffer_size()];
     reader.next_frame(&mut buf).unwrap();
 
-    let width = reader.info().width as usize;
-    let height = reader.info().height as usize;
+    let width = reader.info().width;
+    let height = reader.info().height;
 
-    let mut buffer: Vec<BGRA> = vec![BGRA { b : 0, g : 0, r : 0, a : 0 }; width * height];
+    let mut buffer: Vec<BGRA> = vec![BGRA { b : 0, g : 0, r : 0, a : 0 }; (width * height) as usize];
     for y in 0..height {
         for x in 0..width {
-            let i = (y * width + x) * 4;
+            let base = (y * width + x) as usize;
+            let i = base * 4;
             let (r, g, b, a) = (buf[i + 0], buf[i + 1], buf[i + 2], buf[i + 3]);
-            buffer[y * width + x] = BGRA { b, g, r, a };
+            buffer[base] = BGRA { b, g, r, a };
         }
     }
 
@@ -139,12 +160,15 @@ fn error_dialog(message: &str) {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum WindowControl {
-    Show,
-    Hide,
-    Jiggle,
-    Quit,
+fn start_jiggler(proxy: EventLoopProxy<InterfaceMessage>) {
+    tokio::spawn(async move {
+        // Sometimes fullscreen apps will put themselves over the window, 
+        // so this puts the window back on top once a second
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            proxy.send_event(InterfaceMessage::Jiggle).unwrap();
+        }
+    });
 }
 
 #[tokio::main]
@@ -157,105 +181,30 @@ async fn main() {
 
     // Get foreground window so we can restore focus later
     let previous_focus = unsafe { GetForegroundWindow() };
-
-    let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
-
-    let event_loop = EventLoop::<WindowControl>::with_user_event();
-
-    let core = WindowBuilder::new()
-        .with_visible(false)
-        .build(&event_loop)
-        .unwrap();
-    let window = WindowBuilder::new()
-        .with_owner_window(core.hwnd() as _)
-        .with_inner_size(LogicalSize::new(
-            crosshair.width as u32,
-            crosshair.height as u32,
-        ))
-        .with_decorations(false)
-        .with_transparent(true)
-        .with_visible(true)
-        .with_always_on_top(true)
-        .build(&event_loop)
-        .unwrap();
-    window.set_enable(false);
-
-    center_window(&window);
-    show_window(&window);
-
-    let mut tray = tray::start();
-    let mut key_rx = winky::listen();
     
-    let proxy = event_loop.create_proxy();
-    tokio::spawn(async move {
-        // Sometimes fullscreen apps will put themselves over the window, 
-        // so this puts the window back on top once a second
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            proxy.send_event(WindowControl::Jiggle).unwrap();
-        }
-    });
-
-    let proxy = event_loop.create_proxy();
-    tokio::spawn(async move {
-        let mut showing = true;
-        loop {
-            tokio::select! {
-                Some((code, down)) = key_rx.recv() => {
-                    if code == Key::F10 as u32 && down {
-                        if showing {
-                            proxy.send_event(WindowControl::Hide).unwrap();
-                            tray.off();
-                            showing = false;
-                        } else {
-                            proxy.send_event(WindowControl::Show).unwrap();
-                            tray.on();
-                            showing = true;
-                        }
-                    }
-                }
-                Some(msg) = tray.recv() => {
-                    match msg {
-                        tray::TrayMessage::Show => {
-                            proxy.send_event(WindowControl::Show).unwrap();
-                            tray.on();
-                            showing = true;
-                        }
-                        tray::TrayMessage::Hide => {
-                            proxy.send_event(WindowControl::Hide).unwrap();
-                            tray.off();
-                            showing = false;
-                        }
-                        tray::TrayMessage::Quit => {
-                            tray.quit();
-                            proxy.send_event(WindowControl::Quit).unwrap();
-                            showing = false;
-                        }
-                    }
-                }
-            }
-        }
-    });
+    let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
+    let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
+    let (core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
+    start_jiggler(event_loop.create_proxy());
+    interface::start(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
-    unsafe {
-        SetForegroundWindow(previous_focus);
-    }
+    unsafe { SetForegroundWindow(previous_focus); }
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::UserEvent(WindowControl::Show) => {
+            Event::UserEvent(InterfaceMessage::Show) => {
                 show_window(&window);
             }
-            Event::UserEvent(WindowControl::Hide) => {
+            Event::UserEvent(InterfaceMessage::Hide) => {
                 hide_window(&window);
             }
-            Event::UserEvent(WindowControl::Jiggle) => {
+            Event::UserEvent(InterfaceMessage::Jiggle) => {
                 set_topmost(&window);
             }
-            Event::UserEvent(WindowControl::Quit) => {
+            Event::UserEvent(InterfaceMessage::Quit) => {
                 *control_flow = ControlFlow::Exit;
             }
             Event::WindowEvent {
