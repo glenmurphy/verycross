@@ -184,7 +184,7 @@ async fn main() {
     
     let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
-    let (core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
+    let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy());
     interface::start(event_loop.create_proxy());
 

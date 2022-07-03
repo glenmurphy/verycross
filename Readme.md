@@ -2,7 +2,7 @@
 
 A hotkey/tray based software crosshair for Windows.
 
-Toggle visibility using F10 or the tray icon.
+Toggle visibility using the ScrollLock key or the tray icon.
 
 Here is a screenshot to marvel at:
 
