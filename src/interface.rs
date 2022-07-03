@@ -18,16 +18,19 @@ pub fn start(proxy: EventLoopProxy<InterfaceMessage>) {
         loop {
             tokio::select! {
                 Some((code, down)) = key_rx.recv() => {
-                    if code == Key::ScrollLock as u32 && down {
-                        if showing {
-                            proxy.send_event(InterfaceMessage::Hide).unwrap();
-                            tray.off();
-                            showing = false;
-                        } else {
-                            proxy.send_event(InterfaceMessage::Show).unwrap();
-                            tray.on();
-                            showing = true;
+                    match code {
+                        Key::ScrollLock if down => {
+                            if showing {
+                                proxy.send_event(InterfaceMessage::Hide).unwrap();
+                                tray.off();
+                                showing = false;
+                            } else {
+                                proxy.send_event(InterfaceMessage::Show).unwrap();
+                                tray.on();
+                                showing = true;
+                            }
                         }
+                        _ => {}
                     }
                 }
                 Some(msg) = tray.recv() => {
