@@ -5,6 +5,7 @@
 )]
 mod interface;
 mod tray;
+mod config;
 
 use single_instance::SingleInstance;
 use winapi::{
@@ -69,6 +70,9 @@ fn make_overlay(window: &Window) {
     }
 }
 
+/// Sets the window to be the topmost window; we have to 
+/// call this occasionally because other apps will sometimes
+/// attempt to do the same.
 fn set_topmost(window: &Window) {
     unsafe {
         let hwnd = window.hwnd() as *mut HWND__;
@@ -183,6 +187,7 @@ async fn main() {
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy(), 1000);
     interface::start(event_loop.create_proxy());
+    let mut config = config::new(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
     unsafe { SetForegroundWindow(previous_focus); }
@@ -193,6 +198,7 @@ async fn main() {
         match event {
             Event::UserEvent(InterfaceMessage::Show) => show_window(&window),
             Event::UserEvent(InterfaceMessage::Hide) => hide_window(&window),
+            Event::UserEvent(InterfaceMessage::Config) => config.open(),
             Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
             Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => fill_window(&crosshair, &window),

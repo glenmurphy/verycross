@@ -7,6 +7,7 @@ use crate::tray;
 pub enum InterfaceMessage {
     Show,
     Hide,
+    Config,
     Jiggle,
     Quit,
 }
@@ -40,6 +41,10 @@ impl Interface {
         self.showing = false;
     }
 
+    fn config(&mut self) {
+        self.event_proxy.send_event(InterfaceMessage::Config).unwrap();
+    }
+
     fn toggle(&mut self) {
         if self.showing { self.hide() } else { self.show() }
     }
@@ -63,6 +68,7 @@ impl Interface {
                     match msg {
                         tray::TrayMessage::Show => self.show(),
                         tray::TrayMessage::Hide => self.hide(),
+                        tray::TrayMessage::Config => self.config(),
                         tray::TrayMessage::Quit => self.quit(),
                     }
                 }
