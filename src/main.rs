@@ -12,7 +12,7 @@ use winapi::{
     um::winuser::{
         GetForegroundWindow, GetWindowLongPtrW, SetForegroundWindow,
         SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-        WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
+        WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, MessageBoxA,
     },
 };
 use winit::{
@@ -53,11 +53,10 @@ fn create_window(width: u32, height: u32, event_loop: &EventLoop<InterfaceMessag
 fn make_overlay(window: &Window) {
     let hwnd = window.hwnd() as *mut HWND__;
     unsafe {
-        let window_styles: isize = match { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } {
-            0 => panic!("GetWindowLongPtrW returned 0"),
-            ptr => ptr,
-        };
-        if SetWindowLongPtrW(
+        let window_styles = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        assert!(window_styles != 0);
+
+        let result = SetWindowLongPtrW(
             hwnd,
             GWL_EXSTYLE,
             window_styles
@@ -65,10 +64,8 @@ fn make_overlay(window: &Window) {
                 | WS_EX_LAYERED as isize
                 | WS_EX_TOOLWINDOW as isize
                 | WS_EX_TOPMOST as isize,
-        ) == 0
-        {
-            panic!("SetWindowLongPtrW returned 0");
-        };
+        );
+        assert!(result != 0);
     }
 }
 
@@ -150,7 +147,7 @@ fn error_dialog(message: &str) {
     let lp_text = std::ffi::CString::new(message).unwrap();
     let lp_caption = std::ffi::CString::new("Error").unwrap();
     unsafe {
-        winapi::um::winuser::MessageBoxA(
+        MessageBoxA(
             GetForegroundWindow(),
             lp_text.as_ptr(),
             lp_caption.as_ptr(),

@@ -8,8 +8,9 @@ pub enum TrayMessage {
     Quit,
 }
 
+#[derive(Debug)]
 #[allow(unused)]
-pub enum TrayControl {
+enum TrayControl {
     On,
     Off,
     Quit,
@@ -22,18 +23,14 @@ pub struct TrayInterface {
 }
 
 impl TrayInterface {
-    pub fn send(&self, msg: TrayControl) {
-        #[cfg(target_os = "windows")]
-        let _ = self.control_tx.send(msg);
-    }
     pub fn on(&self) {
-        self.send(TrayControl::On);
+        self.control_tx.send(TrayControl::On).unwrap()
     }
     pub fn off(&self) {
-        self.send(TrayControl::Off);
+        self.control_tx.send(TrayControl::Off).unwrap();
     }
     pub fn quit(&self) {
-        self.send(TrayControl::Quit);
+        self.control_tx.send(TrayControl::Quit).unwrap();
     }
 
     pub async fn recv(&mut self) -> Option<TrayMessage> {
