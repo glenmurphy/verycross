@@ -1,6 +1,7 @@
+use tokio::sync::mpsc::UnboundedReceiver;
 use winit::event_loop::EventLoopProxy;
 use winky::Key;
-use crate::{tray};
+use crate::tray;
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceMessage {
@@ -10,49 +11,68 @@ pub enum InterfaceMessage {
     Quit,
 }
 
-pub fn start(proxy: EventLoopProxy<InterfaceMessage>) {
-    let mut tray = tray::start();
-    let mut key_rx = winky::listen();
-    tokio::spawn(async move {
-        let mut showing = true;
+struct Interface {
+    showing : bool,
+    tray : tray::TrayInterface,
+    key_rx : UnboundedReceiver<(Key, bool)>,
+    event_proxy : EventLoopProxy<InterfaceMessage>
+}
+
+impl Interface {
+    fn new(event_proxy: EventLoopProxy<InterfaceMessage>) -> Interface {
+        Interface {
+            showing : true,
+            tray : tray::start(),
+            key_rx : winky::listen(),
+            event_proxy
+        }
+    }
+
+    fn show(&mut self) {
+        self.event_proxy.send_event(InterfaceMessage::Show).unwrap();
+        self.tray.on();
+        self.showing = true;
+    }
+
+    fn hide(&mut self) {
+        self.event_proxy.send_event(InterfaceMessage::Hide).unwrap();
+        self.tray.off();
+        self.showing = false;
+    }
+
+    fn toggle(&mut self) {
+        if self.showing { self.hide() } else { self.show() }
+    }
+
+    fn quit(&mut self) {
+        self.event_proxy.send_event(InterfaceMessage::Quit).unwrap();
+        self.tray.quit();
+        self.showing = false;
+    }
+
+    async fn listen(&mut self) {
         loop {
             tokio::select! {
-                Some((code, down)) = key_rx.recv() => {
-                    match code {
-                        Key::ScrollLock if down => {
-                            if showing {
-                                proxy.send_event(InterfaceMessage::Hide).unwrap();
-                                tray.off();
-                                showing = false;
-                            } else {
-                                proxy.send_event(InterfaceMessage::Show).unwrap();
-                                tray.on();
-                                showing = true;
-                            }
-                        }
+                Some(key_event) = self.key_rx.recv() => {
+                    match key_event {
+                        (Key::ScrollLock, true) => self.toggle(),
                         _ => {}
                     }
-                }
-                Some(msg) = tray.recv() => {
+                },
+                Some(msg) = self.tray.recv() => {
                     match msg {
-                        tray::TrayMessage::Show => {
-                            proxy.send_event(InterfaceMessage::Show).unwrap();
-                            tray.on();
-                            showing = true;
-                        }
-                        tray::TrayMessage::Hide => {
-                            proxy.send_event(InterfaceMessage::Hide).unwrap();
-                            tray.off();
-                            showing = false;
-                        }
-                        tray::TrayMessage::Quit => {
-                            tray.quit();
-                            proxy.send_event(InterfaceMessage::Quit).unwrap();
-                            showing = false;
-                        }
+                        tray::TrayMessage::Show => self.show(),
+                        tray::TrayMessage::Hide => self.hide(),
+                        tray::TrayMessage::Quit => self.quit(),
                     }
                 }
             }
         }
+    }
+}
+
+pub fn start(event_proxy: EventLoopProxy<InterfaceMessage>) {
+    tokio::spawn(async move {
+        Interface::new(event_proxy).listen().await;
     });
 }
