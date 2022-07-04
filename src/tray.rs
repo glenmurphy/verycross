@@ -15,9 +15,6 @@ pub enum TrayControl {
     Quit,
 }
 
-// MacOS tray blocks the main thread so only Windows allows channels to work,
-// so we have this interface that will only sending on those channels if we're
-// in Windows to prevent the unbounded_channel filling up. This is super daft hax.
 #[allow(unused)]
 pub struct TrayInterface {
     control_tx: UnboundedSender<TrayControl>,
@@ -45,14 +42,13 @@ impl TrayInterface {
 }
 
 #[allow(unused)]
-pub struct Tray {
+struct TrayRunner {
     tray_tx: UnboundedSender<TrayMessage>,
     control_rx: UnboundedReceiver<TrayControl>,
 }
 
-impl Tray {
-    #[cfg(target_os = "windows")]
-    async fn run_win(&mut self) {
+impl TrayRunner {
+    async fn run(&mut self) {
         let mut tray = TrayItem::new("Verycross", "tray-on").unwrap();
         tray.add_label("Verycross").unwrap();
 
@@ -87,56 +83,24 @@ impl Tray {
         }
     }
 
-    #[allow(unused)]
-    #[cfg(target_os = "macos")]
-    fn run_mac(&self) {
-        println!("starting mac tray");
-        let mut tray = TrayItem::new("Panel", "").unwrap();
-        tray.add_label("Panel").unwrap();
-
-        let url = self.url.clone();
-        tray.add_menu_item("Show", move || {
-            let _ = webbrowser::open(&url);
-        })
-        .unwrap();
-
-        let inner = tray.inner_mut();
-        inner.add_quit_item("Quit");
-        inner.display();
-    }
-
-    #[allow(unused)]
-    pub fn new() -> (Self, TrayInterface) {
-        let (tray_tx, mut tray_rx) = unbounded_channel::<TrayMessage>();
-        let (control_tx, control_rx) = unbounded_channel::<TrayControl>();
-        (
-            Tray {
-                tray_tx,
-                control_rx,
-            },
-            TrayInterface {
-                control_tx,
-                tray_rx,
-            },
-        )
-    }
-
-    pub async fn run(&mut self) {
-        // TODO: make this cross platform
-        // TrayItem seems to have a different API on different platforms
-        #[cfg(target_os = "windows")]
-        self.run_win().await;
-
-        // Experimental
-        #[cfg(target_os = "macos")]
-        self.run_mac();
+    pub fn new(tray_tx: UnboundedSender<TrayMessage>, control_rx: UnboundedReceiver<TrayControl>) -> Self {
+        TrayRunner {
+            tray_tx,
+            control_rx,
+        }
     }
 }
 
 pub fn start() -> TrayInterface {
-    let (mut tray, tray_interface) = Tray::new();
+    let (tray_tx, tray_rx) = unbounded_channel::<TrayMessage>();
+    let (control_tx, control_rx) = unbounded_channel::<TrayControl>();
+
     tokio::spawn(async move {
-        tray.run().await;
+        TrayRunner::new(tray_tx, control_rx).run().await;
     });
-    tray_interface
+
+    TrayInterface {
+        control_tx,
+        tray_rx,
+    }
 }
