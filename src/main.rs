@@ -159,12 +159,12 @@ fn error_dialog(message: &str) {
     }
 }
 
-fn start_jiggler(proxy: EventLoopProxy<InterfaceMessage>) {
+fn start_jiggler(proxy: EventLoopProxy<InterfaceMessage>, ms: u64) {
     tokio::spawn(async move {
         // Sometimes fullscreen apps will put themselves over the window, 
         // so this puts the window back on top once a second
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_millis(ms));
             proxy.send_event(InterfaceMessage::Jiggle).unwrap();
         }
     });
@@ -184,7 +184,7 @@ async fn main() {
     let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
-    start_jiggler(event_loop.create_proxy());
+    start_jiggler(event_loop.create_proxy(), 1000);
     interface::start(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
@@ -194,27 +194,17 @@ async fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::UserEvent(InterfaceMessage::Show) => {
-                show_window(&window);
-            }
-            Event::UserEvent(InterfaceMessage::Hide) => {
-                hide_window(&window);
-            }
-            Event::UserEvent(InterfaceMessage::Jiggle) => {
-                set_topmost(&window);
-            }
-            Event::UserEvent(InterfaceMessage::Quit) => {
-                *control_flow = ControlFlow::Exit;
-            }
+            Event::UserEvent(InterfaceMessage::Show) => show_window(&window),
+            Event::UserEvent(InterfaceMessage::Hide) => hide_window(&window),
+            Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
+            Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
+            Event::RedrawRequested(window_id) if window_id == window.id() => fill_window(&crosshair, &window),
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
             } if window_id == window.id() => {
                 *control_flow = ControlFlow::Exit;
-            }
-            Event::RedrawRequested(window_id) if window_id == window.id() => {
-                fill_window(&crosshair, &window);
-            }
+            },
             Event::WindowEvent {
                 window_id,
                 event: WindowEvent::ScaleFactorChanged { .. },
