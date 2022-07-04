@@ -5,6 +5,7 @@ use tray_item::TrayItem;
 pub enum TrayMessage {
     Show,
     Hide,
+    Config,
     Quit,
 }
 
@@ -58,6 +59,12 @@ impl TrayRunner {
         let hide_tx = self.tray_tx.clone();
         tray.add_menu_item("Hide", move || {
             let _ = hide_tx.send(TrayMessage::Hide);
+        })
+        .unwrap();
+
+        let config_tx = self.tray_tx.clone();
+        tray.add_menu_item("Config", move || {
+            let _ = config_tx.send(TrayMessage::Config);
         })
         .unwrap();
 
