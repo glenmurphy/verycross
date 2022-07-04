@@ -4,24 +4,18 @@ use winit::event_loop::EventLoopProxy;
 
 use crate::interface::InterfaceMessage;
 
-#[allow(unused)]
-#[derive(Copy, Clone, Debug)]
-enum Control {
-    Open,
-    Close,
-}
-
 pub struct ConfigInterface {
-    control_tx: UnboundedSender<Control>,
+    app_tx: UnboundedSender<AppMessage>,
+    ui_tx: app::Sender<AppControl>,
 }
 
 #[allow(unused)]
 impl ConfigInterface {
     pub fn open(&mut self) {
-        let _ = self.control_tx.send(Control::Open);
+        self.app_tx.send(AppMessage::Open).unwrap();
     }
     pub fn close(&mut self) {
-        let _ = self.control_tx.send(Control::Close);
+        self.ui_tx.send(AppControl::Close);
     }
 }
 
@@ -34,9 +28,13 @@ enum AppControl {
 
 #[derive(Copy, Clone, Debug)]
 enum AppMessage {
+    // Sent from the app thread
     ShowButton,
     HideButton,
-    Closed
+    Closed,
+
+    // Sent from ConfigInterface
+    Open
 }
 
 fn app_loop(
@@ -44,7 +42,6 @@ fn app_loop(
     ui_tx: app::Sender<AppControl>,
     ui_rx: app::Receiver<AppControl>,
     open_rx: &mut UnboundedReceiver<()>) {
-    // We use a non-async thread so we're not blocking sends on the config_tx channels
     loop {
         let _ = open_rx.blocking_recv();
 
@@ -53,7 +50,7 @@ fn app_loop(
         let mut wind = Window::new(100, 100, 400, 300, "Verycross Configuration");
         let mut frame = Frame::new(0, 0, 400, 200, "");
         frame.set_tooltip("hello");
-                    
+
         let mut hide_but = Button::new(50, 210, 80, 40, "Hide");
         let mut show_but = Button::new(150, 210, 80, 40, "Show");
         let mut close_but = Button::new(250, 210, 80, 40, "Close");
@@ -66,41 +63,30 @@ fn app_loop(
         close_but.emit(ui_tx, AppControl::Close);
 
         while app.wait() {
-            if let Some(msg) = ui_rx.recv() {
-                match msg {
-                    AppControl::ShowButton => {
-                        println!("showbutton");
-                        config_tx.send(AppMessage::ShowButton).unwrap();
-                    }
-                    AppControl::HideButton => {
-                        println!("hidebutton");
-                        config_tx.send(AppMessage::HideButton).unwrap();
-                    }
-                    AppControl::Close => {
-                        println!("close button");
-                        break;
-                    }
-                }
+            match ui_rx.recv() {
+                Some(AppControl::ShowButton) => config_tx.send(AppMessage::ShowButton).unwrap(),
+                Some(AppControl::HideButton) => config_tx.send(AppMessage::HideButton).unwrap(),
+                Some(AppControl::Close) => break,
+                _ => {}
             }
         }
-        app.quit();
 
+        app.quit();
         config_tx.send(AppMessage::Closed).unwrap();
-        // Once a message is received on this channel, the loop begins anew.
     }
 }
 
 pub fn new(main_loop: EventLoopProxy<InterfaceMessage>) -> ConfigInterface {
-    // Used by ConfigInterface to communicate with the control_loop
-    let (control_tx, mut control_rx) =  unbounded_channel();
-
     // Used within the app, and by the control_loop to feed control into the app
     let (ui_tx, ui_rx) = fltk::app::channel::<AppControl>();
 
     // Used by the app to send messages to the control_loop
     let (app_tx, mut app_rx) = unbounded_channel::<AppMessage>();
 
-    // Single-purpose - used by control_loop to signal the app to open
+    // Clone for the Config Interface to send messages to the control loop
+    let control_tx = app_tx.clone();
+
+    // Used by control_loop to signal the app to open
     let (open_tx, mut open_rx) = unbounded_channel::<()>();
     
     // We use a non-async thread so we're not blocking sends on the config_tx channels
@@ -108,38 +94,29 @@ pub fn new(main_loop: EventLoopProxy<InterfaceMessage>) -> ConfigInterface {
         app_loop(app_tx, ui_tx, ui_rx, &mut open_rx);
     });
 
-    // Main control loop - brokers messages between all the channels
+    // Main control loop
     tokio::spawn(async move {
         let mut open = false;
         loop {
-            tokio::select! {
-                // Messages from the app, passed on to the main thread
-                Some(msg) = app_rx.recv() => {
-                    match msg {
-                        AppMessage::ShowButton => main_loop.send_event(InterfaceMessage::Show).unwrap(),
-                        AppMessage::HideButton => main_loop.send_event(InterfaceMessage::Hide).unwrap(),
-                        AppMessage::Closed => open = false,
-                    }
-                },
-                // Messages from ConfigInterface, passed on to the app.
-                Some(msg) = control_rx.recv() => {
-                    match msg {
-                        Control::Open if !open => {
-                            open_tx.send(()).unwrap();
-                            open = true;
-                        },
-                        Control::Close if open => { 
-                            open = false;
-                            ui_tx.send(AppControl::Close);
-                        },
-                        _ => {}
-                    }
+            let msg = app_rx.recv().await.unwrap();
+            match msg {
+                AppMessage::ShowButton => main_loop.send_event(InterfaceMessage::Show).unwrap(),
+                AppMessage::HideButton => main_loop.send_event(InterfaceMessage::Hide).unwrap(),
+                AppMessage::Closed => open = false,
+
+                // Open comes from the config_interface, but we broker it through here because
+                // this is where we can keep track of open states
+                AppMessage::Open if !open => {
+                    open_tx.send(()).unwrap();
+                    open = true;
                 }
+                _ => {}
             }
         }
     });
 
     ConfigInterface {
-        control_tx,
+        app_tx : control_tx,
+        ui_tx,
     }
 }
