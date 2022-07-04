@@ -147,9 +147,8 @@ fn hide_window(window: &Window) {
 
 fn error_dialog(message: &str) {
     println!("Showing error: {}", message);
-    use std::ffi::CString;
-    let lp_text = CString::new(message).unwrap();
-    let lp_caption = CString::new("Error").unwrap();
+    let lp_text = std::ffi::CString::new(message).unwrap();
+    let lp_caption = std::ffi::CString::new("Error").unwrap();
     unsafe {
         winapi::um::winuser::MessageBoxA(
             GetForegroundWindow(),
