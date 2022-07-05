@@ -1,10 +1,11 @@
-use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window};
+use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window, enums::Color};
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel, UnboundedReceiver};
+use crate::settings::{SETTINGS, self};
 
 pub struct ConfigInterface {
     open_tx: UnboundedSender<()>,
     config_rx: UnboundedReceiver<ConfigMessage>,
-    control_tx: app::Sender<UIEvent>,
+    control_tx: app::Sender<Control>,
 }
 
 #[allow(unused)]
@@ -14,7 +15,10 @@ impl ConfigInterface {
     }
     pub fn close(&mut self) {
         println!("Sending close");
-        self.control_tx.send(UIEvent::Close);
+        self.control_tx.send(Control::Close);
+    }
+    pub fn settings_changed(&mut self) {
+        self.control_tx.send(Control::SettingsChanged);
     }
     pub async fn recv(&mut self) -> Option<ConfigMessage> {
         tokio::macros::support::poll_fn(|cx| self.config_rx.poll_recv(cx)).await
@@ -22,11 +26,16 @@ impl ConfigInterface {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum UIEvent {
+enum Control {
+    // Stuff from inside the app
     ShowButton,
     HideButton,
-    CrossButton(usize),
-    Close
+    SetCrossButton(usize),
+    CloseButton,
+
+    // Stuff from outside the app
+    Close,
+    SettingsChanged,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -38,13 +47,13 @@ pub enum ConfigMessage {
     ConfigClosed,
 }
 
-/// We use a lot of channels because fltk's channels have no blocking option, which
-/// we need for the opening code, but fltk's wait() loop won't trigger on channels
+/// We use a lot of channels because fltk's channels cannot block, which we need 
+/// for the opening code, but fltk's wait() loop won't trigger on channels
 /// other than its own.
 fn app_loop(
     config_tx: UnboundedSender<ConfigMessage>,
-    control_tx: app::Sender<UIEvent>,
-    control_rx: app::Receiver<UIEvent>,
+    control_tx: app::Sender<Control>,
+    control_rx: app::Receiver<Control>,
     open_rx: &mut UnboundedReceiver<()>) {
     
     loop {
@@ -56,31 +65,39 @@ fn app_loop(
         let mut frame = Frame::new(0, 0, 400, 200, "");
         frame.set_label("hello");
 
-        let mut cross0_but = Button::new(50, 50, 80, 30, "Cross 0");
-        let mut cross1_but = Button::new(50, 90, 80, 30, "Cross 1");
-        let mut cross2_but = Button::new(50, 130, 80, 30, "Cross 2");
+        let mut c0 = Button::new(50, 50, 80, 30, "Cross 0");
+        c0.emit(control_tx, Control::SetCrossButton(0));
 
-        let mut hide_but = Button::new(50, 210, 60, 30, "Hide");
-        let mut show_but = Button::new(150, 210, 60, 30, "Show");
-        let mut close_but = Button::new(250, 210, 60, 30, "Close");
+        let mut c1 = Button::new(50, 90, 80, 30, "Cross 1");
+        c1.emit(control_tx, Control::SetCrossButton(1));
+
+        let mut c2 = Button::new(50, 130, 80, 30, "Cross 2");
+        c2.emit(control_tx, Control::SetCrossButton(2));
+
+        Button::new(50, 210, 60, 30, "Hide").emit(control_tx, Control::HideButton);
+        Button::new(150, 210, 60, 30, "Show").emit(control_tx, Control::ShowButton);
+        Button::new(250, 210, 60, 30, "Close").emit(control_tx, Control::CloseButton);
 
         wind.end();
         wind.show();
 
-        cross0_but.emit(control_tx, UIEvent::CrossButton(0));
-        cross1_but.emit(control_tx, UIEvent::CrossButton(1));
-        cross2_but.emit(control_tx, UIEvent::CrossButton(2));
-
-        show_but.emit(control_tx, UIEvent::ShowButton);
-        hide_but.emit(control_tx, UIEvent::HideButton);
-        close_but.emit(control_tx, UIEvent::Close);
-
         while app.wait() {
             match control_rx.recv() {
-                Some(UIEvent::ShowButton) => config_tx.send(ConfigMessage::ShowCross).unwrap(),
-                Some(UIEvent::HideButton) => config_tx.send(ConfigMessage::HideCross).unwrap(),
-                Some(UIEvent::CrossButton(n)) => config_tx.send(ConfigMessage::SetCross(n)).unwrap(),
-                Some(UIEvent::Close) => break,
+                // Stuff from the app
+                Some(Control::ShowButton) => config_tx.send(ConfigMessage::ShowCross).unwrap(),
+                Some(Control::HideButton) => config_tx.send(ConfigMessage::HideCross).unwrap(),
+                Some(Control::SetCrossButton(n)) => config_tx.send(ConfigMessage::SetCross(n)).unwrap(),
+                Some(Control::CloseButton) => break,
+
+                // Stuff from outside the app
+                Some(Control::Close) => break,
+                Some(Control::SettingsChanged) => {
+                    let n = settings::get().crosshair;
+                    c0.set_color( if n == 0 { Color::Selection } else { Color::Free } );
+                    c1.set_color( if n == 1 { Color::Selection } else { Color::Free } );
+                    c2.set_color( if n == 2 { Color::Selection } else { Color::Free } );
+                    app.redraw();
+                }
                 _ => {}
             }
         }
@@ -92,7 +109,7 @@ fn app_loop(
 
 pub fn new() -> ConfigInterface {
     // Used within the app, and by the control_loop to feed events into the app
-    let (control_tx, control_rx) = fltk::app::channel::<UIEvent>();
+    let (control_tx, control_rx) = fltk::app::channel::<Control>();
 
     // Used by the app to send messages to the control_loop
     let (config_tx, config_rx) = unbounded_channel::<ConfigMessage>();

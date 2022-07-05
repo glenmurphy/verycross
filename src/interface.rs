@@ -1,8 +1,10 @@
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::UnboundedSender;
 use winit::event_loop::EventLoopProxy;
 use winky::Key;
 use crate::tray;
 use crate::config;
+use crate::settings;
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceMessage {
@@ -13,23 +15,25 @@ pub enum InterfaceMessage {
     Quit,
 }
 
-struct Interface {
+struct InterfaceRunner {
     showing : bool,
     tray : tray::TrayInterface,
     config : config::ConfigInterface,
     config_open : bool,
     key_rx : UnboundedReceiver<(Key, bool)>,
+    main_rx: UnboundedReceiver<InterfaceControl>,
     event_proxy : EventLoopProxy<InterfaceMessage>
 }
 
-impl Interface {
-    fn new(event_proxy: EventLoopProxy<InterfaceMessage>) -> Interface {
-        Interface {
+impl InterfaceRunner {
+    fn new(event_proxy: EventLoopProxy<InterfaceMessage>, main_rx: UnboundedReceiver<InterfaceControl>) -> InterfaceRunner {
+        InterfaceRunner {
             showing : true,
             tray : tray::start(),
             config : config::new(),
             config_open : false,
             key_rx : winky::listen(),
+            main_rx,
             event_proxy
         }
     }
@@ -46,10 +50,10 @@ impl Interface {
         self.showing = false;
     }
 
-    fn set_cross(&mut self, x: usize) {
-        self.event_proxy.send_event(InterfaceMessage::SetCross(x)).unwrap();
+    fn set_cross(&mut self, n: usize) {
+        self.event_proxy.send_event(InterfaceMessage::SetCross(n)).unwrap();   
     }
-    
+
     fn toggle_cross(&mut self) {
         if self.showing { self.hide_cross() } else { self.show_cross() }
     }
@@ -73,6 +77,7 @@ impl Interface {
     }
 
     async fn listen(&mut self) {
+        let settings_rx = settings::subscribe();
         loop {
             tokio::select! {
                 Some(key_event) = self.key_rx.recv() => {
@@ -97,13 +102,30 @@ impl Interface {
                         config::ConfigMessage::ConfigClosed => self.config_open = false,
                     }
                 },
+                Some(msg) = self.main_rx.recv() => {
+                    continue;
+                },
             }
         }
     }
 }
 
-pub fn start(event_proxy: EventLoopProxy<InterfaceMessage>) {
+
+enum InterfaceControl {}
+
+pub struct Interface {
+    main_tx : UnboundedSender<InterfaceControl>,
+}
+
+impl Interface {}
+
+pub fn start(event_proxy: EventLoopProxy<InterfaceMessage>) -> Interface {
+    let (main_tx, main_rx) = tokio::sync::mpsc::unbounded_channel();
     tokio::spawn(async move {
-        Interface::new(event_proxy).listen().await;
+        InterfaceRunner::new(event_proxy, main_rx).listen().await;
     });
+
+    Interface {
+        main_tx
+    }
 }

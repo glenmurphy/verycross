@@ -6,6 +6,7 @@
 mod interface;
 mod tray;
 mod config;
+mod settings;
 
 use single_instance::SingleInstance;
 use winapi::{
@@ -188,13 +189,13 @@ async fn main() {
         load_image(include_bytes!("../assets/crosshair2.png")).await,
     ];
 
-    let mut active_crosshair = 0;
-    let crosshair = crosshairs.get(active_crosshair).unwrap();
+    settings::init();
+    let crosshair = crosshairs.get(settings::get().crosshair).unwrap();
 
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy(), 1000);
-    interface::start(event_loop.create_proxy());
+    let interface = interface::start(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
     unsafe { SetForegroundWindow(previous_focus); }
@@ -208,11 +209,11 @@ async fn main() {
             Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
             Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
             Event::UserEvent(InterfaceMessage::SetCross(n)) => {
-                active_crosshair = n;
-                fill_window(&(crosshairs[active_crosshair]), &window);
+                settings::set_crosshair(n);
+                fill_window(&(crosshairs[settings::get().crosshair]), &window);
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                fill_window(&(crosshairs[active_crosshair]), &window);
+                fill_window(&(crosshairs[settings::get().crosshair]), &window);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
