@@ -77,7 +77,7 @@ impl InterfaceRunner {
     }
 
     async fn listen(&mut self) {
-        let settings_rx = settings::subscribe();
+        let mut settings_rx = settings::subscribe();
         loop {
             tokio::select! {
                 Some(key_event) = self.key_rx.recv() => {
@@ -103,21 +103,32 @@ impl InterfaceRunner {
                     }
                 },
                 Some(msg) = self.main_rx.recv() => {
-                    continue;
+                    match msg {
+                        InterfaceControl::Quit => self.quit(),
+                    }
                 },
+                Ok(_) = settings_rx.recv() => {
+                    self.config.settings_changed();
+                }
             }
         }
     }
 }
 
 
-enum InterfaceControl {}
+enum InterfaceControl {
+    Quit
+}
 
 pub struct Interface {
     main_tx : UnboundedSender<InterfaceControl>,
 }
 
-impl Interface {}
+impl Interface {
+    pub fn quit(&mut self) {
+        let _ = self.main_tx.send(InterfaceControl::Quit);
+    }
+}
 
 pub fn start(event_proxy: EventLoopProxy<InterfaceMessage>) -> Interface {
     let (main_tx, main_rx) = tokio::sync::mpsc::unbounded_channel();

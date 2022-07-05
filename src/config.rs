@@ -1,6 +1,6 @@
 use fltk::{app, button::Button, frame::Frame, prelude::*, window::Window, enums::Color};
 use tokio::sync::mpsc::{UnboundedSender, unbounded_channel, UnboundedReceiver};
-use crate::settings::{SETTINGS, self};
+use crate::settings;
 
 pub struct ConfigInterface {
     open_tx: UnboundedSender<()>,
@@ -47,6 +47,25 @@ pub enum ConfigMessage {
     ConfigClosed,
 }
 
+fn create_crosshair_buttons(control_tx: app::Sender<Control>) -> Vec<Button> {
+    let mut c0 = Button::new(50, 50, 80, 30, "Cross 0");
+    c0.emit(control_tx, Control::SetCrossButton(0));
+    
+    let mut c1 = Button::new(50, 90, 80, 30, "Cross 1");
+    c1.emit(control_tx, Control::SetCrossButton(1));
+
+    let mut c2 = Button::new(50, 130, 80, 30, "Cross 2");
+    c2.emit(control_tx, Control::SetCrossButton(2));
+
+    vec![c0, c1, c2]
+}
+
+fn set_crosshair_button_colors(buttons: &mut Vec<Button>, index: usize) {
+    for i in 0..buttons.len() {
+        buttons[i].set_color(if i == index { Color::Red } else { Color::White });
+    }
+}
+
 /// We use a lot of channels because fltk's channels cannot block, which we need 
 /// for the opening code, but fltk's wait() loop won't trigger on channels
 /// other than its own.
@@ -65,14 +84,8 @@ fn app_loop(
         let mut frame = Frame::new(0, 0, 400, 200, "");
         frame.set_label("hello");
 
-        let mut c0 = Button::new(50, 50, 80, 30, "Cross 0");
-        c0.emit(control_tx, Control::SetCrossButton(0));
-
-        let mut c1 = Button::new(50, 90, 80, 30, "Cross 1");
-        c1.emit(control_tx, Control::SetCrossButton(1));
-
-        let mut c2 = Button::new(50, 130, 80, 30, "Cross 2");
-        c2.emit(control_tx, Control::SetCrossButton(2));
+        let mut buttons = create_crosshair_buttons(control_tx.clone());
+        set_crosshair_button_colors(&mut buttons, settings::get().crosshair);
 
         Button::new(50, 210, 60, 30, "Hide").emit(control_tx, Control::HideButton);
         Button::new(150, 210, 60, 30, "Show").emit(control_tx, Control::ShowButton);
@@ -92,10 +105,7 @@ fn app_loop(
                 // Stuff from outside the app
                 Some(Control::Close) => break,
                 Some(Control::SettingsChanged) => {
-                    let n = settings::get().crosshair;
-                    c0.set_color( if n == 0 { Color::Selection } else { Color::Free } );
-                    c1.set_color( if n == 1 { Color::Selection } else { Color::Free } );
-                    c2.set_color( if n == 2 { Color::Selection } else { Color::Free } );
+                    set_crosshair_button_colors(&mut buttons, settings::get().crosshair);
                     app.redraw();
                 }
                 _ => {}

@@ -195,7 +195,7 @@ async fn main() {
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy(), 1000);
-    let interface = interface::start(event_loop.create_proxy());
+    let mut interface = interface::start(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
     unsafe { SetForegroundWindow(previous_focus); }
@@ -207,14 +207,17 @@ async fn main() {
             Event::UserEvent(InterfaceMessage::ShowCross) => show_window(&window),
             Event::UserEvent(InterfaceMessage::HideCross) => hide_window(&window),
             Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
-            Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
+            Event::UserEvent(InterfaceMessage::Quit) => {
+                interface.quit();
+                *control_flow = ControlFlow::Exit;
+            },
             Event::UserEvent(InterfaceMessage::SetCross(n)) => {
                 settings::set_crosshair(n);
                 fill_window(&(crosshairs[settings::get().crosshair]), &window);
             },
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 fill_window(&(crosshairs[settings::get().crosshair]), &window);
-            }
+            },
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
@@ -226,7 +229,7 @@ async fn main() {
                 event: WindowEvent::ScaleFactorChanged { .. },
             } if window_id == window.id() => {
                 center_window(&window);
-            }
+            },
             _ => (),
         }
     });
