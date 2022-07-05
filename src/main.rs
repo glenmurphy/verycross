@@ -107,7 +107,7 @@ fn fill_window(image: &Image, window: &Window) {
     buffer.blit(&window).unwrap();
 }
 
-fn load_image(bytes: &[u8]) -> Image {
+async fn load_image(bytes: &[u8]) -> Image {
     let decoder = png::Decoder::new(bytes);
 
     let mut reader = decoder.read_info().unwrap();
@@ -165,7 +165,7 @@ fn start_jiggler(proxy: EventLoopProxy<InterfaceMessage>, ms: u64) {
         // Sometimes fullscreen apps will put themselves over the window, 
         // so this puts the window back on top once a second
         loop {
-            std::thread::sleep(std::time::Duration::from_millis(ms));
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
             proxy.send_event(InterfaceMessage::Jiggle).unwrap();
         }
     });
@@ -182,12 +182,13 @@ async fn main() {
     // Get foreground window so we can restore focus later
     let previous_focus = unsafe { GetForegroundWindow() };
     
-    let crosshair = load_image(include_bytes!("../assets/crosshair.png"));
+    let crosshair = load_image(include_bytes!("../assets/crosshair.png")).await;
+
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy(), 1000);
     interface::start(event_loop.create_proxy());
-    let mut config = config::new(event_loop.create_proxy());
+    //let mut config = config::new(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
     unsafe { SetForegroundWindow(previous_focus); }
@@ -196,9 +197,8 @@ async fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::UserEvent(InterfaceMessage::Show) => show_window(&window),
-            Event::UserEvent(InterfaceMessage::Hide) => hide_window(&window),
-            Event::UserEvent(InterfaceMessage::Config) => config.open(),
+            Event::UserEvent(InterfaceMessage::ShowCross) => show_window(&window),
+            Event::UserEvent(InterfaceMessage::HideCross) => hide_window(&window),
             Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
             Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
             Event::RedrawRequested(window_id) if window_id == window.id() => fill_window(&crosshair, &window),

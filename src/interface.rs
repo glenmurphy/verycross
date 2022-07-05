@@ -2,12 +2,12 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use winit::event_loop::EventLoopProxy;
 use winky::Key;
 use crate::tray;
+use crate::config;
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceMessage {
-    Show,
-    Hide,
-    Config,
+    ShowCross,
+    HideCross,
     Jiggle,
     Quit,
 }
@@ -15,6 +15,8 @@ pub enum InterfaceMessage {
 struct Interface {
     showing : bool,
     tray : tray::TrayInterface,
+    config : config::ConfigInterface,
+    config_open : bool,
     key_rx : UnboundedReceiver<(Key, bool)>,
     event_proxy : EventLoopProxy<InterfaceMessage>
 }
@@ -24,25 +26,33 @@ impl Interface {
         Interface {
             showing : true,
             tray : tray::start(),
+            config : config::new(),
+            config_open : false,
             key_rx : winky::listen(),
             event_proxy
         }
     }
 
     fn show(&mut self) {
-        self.event_proxy.send_event(InterfaceMessage::Show).unwrap();
+        self.event_proxy.send_event(InterfaceMessage::ShowCross).unwrap();
         self.tray.on();
         self.showing = true;
     }
 
     fn hide(&mut self) {
-        self.event_proxy.send_event(InterfaceMessage::Hide).unwrap();
+        self.event_proxy.send_event(InterfaceMessage::HideCross).unwrap();
         self.tray.off();
         self.showing = false;
     }
 
-    fn config(&mut self) {
-        self.event_proxy.send_event(InterfaceMessage::Config).unwrap();
+    fn open_config(&mut self) {
+        if self.config_open {
+            self.config.close();
+            self.config_open = false;
+        } else {
+            self.config.open();
+            self.config_open = true;
+        }
     }
 
     fn toggle(&mut self) {
@@ -68,10 +78,17 @@ impl Interface {
                     match msg {
                         tray::TrayMessage::Show => self.show(),
                         tray::TrayMessage::Hide => self.hide(),
-                        tray::TrayMessage::Config => self.config(),
+                        tray::TrayMessage::Config => self.open_config(),
                         tray::TrayMessage::Quit => self.quit(),
                     }
-                }
+                },
+                Some(msg) = self.config.recv() => {
+                    match msg {
+                        config::ConfigMessage::ShowCross => self.show(),
+                        config::ConfigMessage::HideCross => self.hide(),
+                        config::ConfigMessage::ConfigClosed => self.config_open = false,
+                    }
+                },
             }
         }
     }
