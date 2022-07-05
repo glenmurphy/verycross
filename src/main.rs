@@ -201,7 +201,6 @@ async fn main() {
         load_image(include_bytes!("../assets/crosshair2.png")).await,
     ];
 
-    settings::init();
     let crosshair = crosshairs.get(settings::get().crosshair).unwrap();
 
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();

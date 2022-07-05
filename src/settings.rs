@@ -1,15 +1,40 @@
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use state::Storage;
+//use state::Storage;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
 
-static SETTINGS: Storage<RwLock<Settings>> = Storage::new();
-static SETTINGS_CHANNEL: Storage<broadcast::Sender<()>> = Storage::new();
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref SETTINGS: RwLock<Settings> = RwLock::new(
+        *load().coerce()
+    );
+    static ref SETTINGS_CHANNEL: broadcast::Sender<()> = {
+        let (tx, _rx) = broadcast::channel::<()>(4);
+        tx
+    };
+}
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
     pub crosshair: usize,
+}
+
+impl Settings {
+    pub fn default() -> Settings {
+        Settings { 
+            crosshair: 0
+        }
+    }
+
+    pub fn coerce(&mut self) -> &Settings {
+        if self.crosshair > 2 {
+            println!("Settings: coercing crosshair to 0");
+            self.crosshair = 0;
+        }
+        self
+    }
 }
 
 fn get_config_dir() -> std::path::PathBuf {
@@ -23,14 +48,15 @@ fn get_config_filepath() -> std::path::PathBuf {
 
 fn load() -> Settings {
     if let Ok(data) = std::fs::read_to_string(get_config_filepath()) {
-        if let Ok(settings) = serde_json::from_str::<Settings>(&data) {
+        if let Ok(mut settings) = serde_json::from_str::<Settings>(&data) {
             println!("Loaded settings from disk");
+            settings.coerce();
             return settings;
         }
     }
 
     println!("No saved settings; using defaults");
-    Settings { crosshair: 0 }
+    Settings::default()
 }
 
 fn save() {
@@ -39,11 +65,12 @@ fn save() {
             println!("Created save directory");
         } else {
             println!("Error creating save directory");
+            return;
         }
     }
 
-    let settings = *get();
-    let serialized = serde_json::to_string(&settings).unwrap();
+    let mut settings = *get_mut();
+    let serialized = serde_json::to_string(settings.coerce()).unwrap();
     if std::fs::write(get_config_filepath(), serialized).is_ok() {
         println!("Saved settings to disk");
     } else {
@@ -51,27 +78,21 @@ fn save() {
     }
 }
 
-pub fn init() {
-    let (tx, _rx) = broadcast::channel::<()>(4);
-    SETTINGS_CHANNEL.set(tx);
-    SETTINGS.set(RwLock::new(load()));
-}
-
 fn get_mut() -> std::sync::RwLockWriteGuard<'static, Settings> {
-    SETTINGS.get().write().unwrap()
+    SETTINGS.write().unwrap()
 }
 
 fn updated() {
     save();
-    SETTINGS_CHANNEL.get().send(()).unwrap();
+    SETTINGS_CHANNEL.send(()).unwrap();
 }
 
 pub fn subscribe() -> broadcast::Receiver<()> {
-    SETTINGS_CHANNEL.get().subscribe()
+    SETTINGS_CHANNEL.subscribe()
 }
 
 pub fn get() -> std::sync::RwLockReadGuard<'static, Settings> {
-    SETTINGS.get().read().unwrap()
+    SETTINGS.read().unwrap()
 }
 
 pub fn set_crosshair(n: usize) {
