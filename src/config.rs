@@ -56,8 +56,9 @@ fn app_loop(
         let mut frame = Frame::new(0, 0, 400, 200, "");
         frame.set_label("hello");
 
-        let mut cross0_but = Button::new(50, 50, 80, 30, "Cross 1");
-        let mut cross1_but = Button::new(50, 90, 80, 30, "Cross 2");
+        let mut cross0_but = Button::new(50, 50, 80, 30, "Cross 0");
+        let mut cross1_but = Button::new(50, 90, 80, 30, "Cross 1");
+        let mut cross2_but = Button::new(50, 130, 80, 30, "Cross 2");
 
         let mut hide_but = Button::new(50, 210, 60, 30, "Hide");
         let mut show_but = Button::new(150, 210, 60, 30, "Show");
@@ -68,6 +69,8 @@ fn app_loop(
 
         cross0_but.emit(control_tx, UIEvent::CrossButton(0));
         cross1_but.emit(control_tx, UIEvent::CrossButton(1));
+        cross2_but.emit(control_tx, UIEvent::CrossButton(2));
+
         show_but.emit(control_tx, UIEvent::ShowButton);
         hide_but.emit(control_tx, UIEvent::HideButton);
         close_but.emit(control_tx, UIEvent::Close);

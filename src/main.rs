@@ -183,8 +183,9 @@ async fn main() {
     let previous_focus = unsafe { GetForegroundWindow() };
     
     let crosshairs = vec![
+        load_image(include_bytes!("../assets/crosshair0.png")).await,
         load_image(include_bytes!("../assets/crosshair1.png")).await,
-        load_image(include_bytes!("../assets/crosshair2.png")).await
+        load_image(include_bytes!("../assets/crosshair2.png")).await,
     ];
 
     let mut active_crosshair = 0;
@@ -194,7 +195,6 @@ async fn main() {
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
     start_jiggler(event_loop.create_proxy(), 1000);
     interface::start(event_loop.create_proxy());
-    //let mut config = config::new(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
     unsafe { SetForegroundWindow(previous_focus); }
