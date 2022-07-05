@@ -182,7 +182,13 @@ async fn main() {
     // Get foreground window so we can restore focus later
     let previous_focus = unsafe { GetForegroundWindow() };
     
-    let crosshair = load_image(include_bytes!("../assets/crosshair.png")).await;
+    let crosshairs = vec![
+        load_image(include_bytes!("../assets/crosshair1.png")).await,
+        load_image(include_bytes!("../assets/crosshair2.png")).await
+    ];
+
+    let mut active_crosshair = 0;
+    let crosshair = crosshairs.get(active_crosshair).unwrap();
 
     let event_loop = EventLoop::<InterfaceMessage>::with_user_event();
     let (_core, window) = create_window(crosshair.width, crosshair.height, &event_loop);
@@ -201,7 +207,13 @@ async fn main() {
             Event::UserEvent(InterfaceMessage::HideCross) => hide_window(&window),
             Event::UserEvent(InterfaceMessage::Jiggle) => set_topmost(&window),
             Event::UserEvent(InterfaceMessage::Quit) => *control_flow = ControlFlow::Exit,
-            Event::RedrawRequested(window_id) if window_id == window.id() => fill_window(&crosshair, &window),
+            Event::UserEvent(InterfaceMessage::SetCross(n)) => {
+                active_crosshair = n;
+                fill_window(&(crosshairs[active_crosshair]), &window);
+            },
+            Event::RedrawRequested(window_id) if window_id == window.id() => {
+                fill_window(&(crosshairs[active_crosshair]), &window);
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,

@@ -8,6 +8,7 @@ use crate::config;
 pub enum InterfaceMessage {
     ShowCross,
     HideCross,
+    SetCross(usize),
     Jiggle,
     Quit,
 }
@@ -43,6 +44,10 @@ impl Interface {
         self.event_proxy.send_event(InterfaceMessage::HideCross).unwrap();
         self.tray.off();
         self.showing = false;
+    }
+
+    fn set_cross(&mut self, x: usize) {
+        self.event_proxy.send_event(InterfaceMessage::SetCross(x)).unwrap();
     }
 
     fn open_config(&mut self) {
@@ -86,6 +91,7 @@ impl Interface {
                     match msg {
                         config::ConfigMessage::ShowCross => self.show(),
                         config::ConfigMessage::HideCross => self.hide(),
+                        config::ConfigMessage::SetCross(x) => self.set_cross(x),
                         config::ConfigMessage::ConfigClosed => self.config_open = false,
                     }
                 },

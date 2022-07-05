@@ -25,6 +25,7 @@ impl ConfigInterface {
 enum UIEvent {
     ShowButton,
     HideButton,
+    CrossButton(usize),
     Close
 }
 
@@ -33,6 +34,7 @@ pub enum ConfigMessage {
     // Sent from the app thread
     ShowCross,
     HideCross,
+    SetCross(usize),
     ConfigClosed,
 }
 
@@ -54,13 +56,18 @@ fn app_loop(
         let mut frame = Frame::new(0, 0, 400, 200, "");
         frame.set_label("hello");
 
-        let mut hide_but = Button::new(50, 210, 80, 40, "Hide");
-        let mut show_but = Button::new(150, 210, 80, 40, "Show");
-        let mut close_but = Button::new(250, 210, 80, 40, "Close");
+        let mut cross0_but = Button::new(50, 50, 80, 30, "Cross 1");
+        let mut cross1_but = Button::new(50, 90, 80, 30, "Cross 2");
+
+        let mut hide_but = Button::new(50, 210, 60, 30, "Hide");
+        let mut show_but = Button::new(150, 210, 60, 30, "Show");
+        let mut close_but = Button::new(250, 210, 60, 30, "Close");
 
         wind.end();
         wind.show();
 
+        cross0_but.emit(control_tx, UIEvent::CrossButton(0));
+        cross1_but.emit(control_tx, UIEvent::CrossButton(1));
         show_but.emit(control_tx, UIEvent::ShowButton);
         hide_but.emit(control_tx, UIEvent::HideButton);
         close_but.emit(control_tx, UIEvent::Close);
@@ -69,6 +76,7 @@ fn app_loop(
             match control_rx.recv() {
                 Some(UIEvent::ShowButton) => config_tx.send(ConfigMessage::ShowCross).unwrap(),
                 Some(UIEvent::HideButton) => config_tx.send(ConfigMessage::HideCross).unwrap(),
+                Some(UIEvent::CrossButton(n)) => config_tx.send(ConfigMessage::SetCross(n)).unwrap(),
                 Some(UIEvent::Close) => break,
                 _ => {}
             }
