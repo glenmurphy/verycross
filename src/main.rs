@@ -3,18 +3,19 @@
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
 )]
-mod interface;
-mod tray;
 mod config;
+mod interface;
 mod settings;
+mod tray;
 
+use interface::InterfaceMessage;
 use single_instance::SingleInstance;
 use winapi::{
     shared::windef::HWND__,
     um::winuser::{
-        GetForegroundWindow, GetWindowLongPtrW, SetForegroundWindow,
+        GetForegroundWindow, GetWindowLongPtrW, MessageBoxA, SetForegroundWindow,
         SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-        WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, MessageBoxA,
+        WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
     },
 };
 use winit::{
@@ -26,16 +27,19 @@ use winit::{
     window::WindowBuilder,
 };
 use winit_blit::{NativeFormat, PixelBufferTyped, BGRA};
-use interface::InterfaceMessage;
 
-fn create_window(width: u32, height: u32, event_loop: &EventLoop<InterfaceMessage>) -> (Window, Window) {
+fn create_window(
+    width: u32,
+    height: u32,
+    event_loop: &EventLoop<InterfaceMessage>,
+) -> (Window, Window) {
     let core = WindowBuilder::new()
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
     let window = WindowBuilder::new()
         .with_owner_window(core.hwnd() as _)
-        .with_inner_size(LogicalSize::new(width, height,))
+        .with_inner_size(LogicalSize::new(width, height))
         .with_decorations(false)
         .with_transparent(true)
         .with_visible(true)
@@ -71,7 +75,7 @@ fn make_overlay(window: &Window) {
     }
 }
 
-/// Sets the window to be the topmost window; we have to 
+/// Sets the window to be the topmost window; we have to
 /// call this occasionally because other apps will sometimes
 /// attempt to do the same.
 fn set_topmost(window: &Window) {
@@ -118,7 +122,15 @@ async fn load_image(bytes: &[u8]) -> Image {
     let width = reader.info().width;
     let height = reader.info().height;
 
-    let mut buffer: Vec<BGRA> = vec![BGRA { b : 0, g : 0, r : 0, a : 0 }; (width * height) as usize];
+    let mut buffer: Vec<BGRA> = vec![
+        BGRA {
+            b: 0,
+            g: 0,
+            r: 0,
+            a: 0
+        };
+        (width * height) as usize
+    ];
     for y in 0..height {
         for x in 0..width {
             let base = (y * width + x) as usize;
@@ -141,7 +153,7 @@ fn show_window(window: &Window) {
     set_topmost(window);
 }
 
-fn hide_window(window: &Window) {    
+fn hide_window(window: &Window) {
     // set_visible occasionally steals focus, so we send the window
     // offscreen instead
     window.set_outer_position(PhysicalPosition::new(-1000, -1000));
@@ -163,7 +175,7 @@ fn error_dialog(message: &str) {
 
 fn start_jiggler(proxy: EventLoopProxy<InterfaceMessage>, ms: u64) {
     tokio::spawn(async move {
-        // Sometimes fullscreen apps will put themselves over the window, 
+        // Sometimes fullscreen apps will put themselves over the window,
         // so this puts the window back on top once a second
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
@@ -182,7 +194,7 @@ async fn main() {
 
     // Get foreground window so we can restore focus later
     let previous_focus = unsafe { GetForegroundWindow() };
-    
+
     let crosshairs = vec![
         load_image(include_bytes!("../assets/crosshair0.png")).await,
         load_image(include_bytes!("../assets/crosshair1.png")).await,
@@ -198,7 +210,9 @@ async fn main() {
     let mut interface = interface::start(event_loop.create_proxy());
 
     // Restore focus to the previously focused window
-    unsafe { SetForegroundWindow(previous_focus); }
+    unsafe {
+        SetForegroundWindow(previous_focus);
+    }
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -210,26 +224,26 @@ async fn main() {
             Event::UserEvent(InterfaceMessage::Quit) => {
                 interface.quit();
                 *control_flow = ControlFlow::Exit;
-            },
+            }
             Event::UserEvent(InterfaceMessage::SetCross(n)) => {
                 settings::set_crosshair(n);
                 fill_window(&(crosshairs[settings::get().crosshair]), &window);
-            },
+            }
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 fill_window(&(crosshairs[settings::get().crosshair]), &window);
-            },
+            }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id,
             } if window_id == window.id() => {
                 *control_flow = ControlFlow::Exit;
-            },
+            }
             Event::WindowEvent {
                 window_id,
                 event: WindowEvent::ScaleFactorChanged { .. },
             } if window_id == window.id() => {
                 center_window(&window);
-            },
+            }
             _ => (),
         }
     });

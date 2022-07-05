@@ -87,7 +87,10 @@ impl TrayRunner {
         }
     }
 
-    pub fn new(tray_tx: UnboundedSender<TrayMessage>, control_rx: UnboundedReceiver<TrayControl>) -> Self {
+    pub fn new(
+        tray_tx: UnboundedSender<TrayMessage>,
+        control_rx: UnboundedReceiver<TrayControl>,
+    ) -> Self {
         TrayRunner {
             tray_tx,
             control_rx,

@@ -1,10 +1,10 @@
+use crate::config;
+use crate::settings;
+use crate::tray;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
 use winit::event_loop::EventLoopProxy;
 use winky::Key;
-use crate::tray;
-use crate::config;
-use crate::settings;
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceMessage {
@@ -16,46 +16,59 @@ pub enum InterfaceMessage {
 }
 
 struct InterfaceRunner {
-    showing : bool,
-    tray : tray::TrayInterface,
-    config : config::ConfigInterface,
-    config_open : bool,
-    key_rx : UnboundedReceiver<(Key, bool)>,
+    showing: bool,
+    tray: tray::TrayInterface,
+    config: config::ConfigInterface,
+    config_open: bool,
+    key_rx: UnboundedReceiver<(Key, bool)>,
     main_rx: UnboundedReceiver<InterfaceControl>,
-    event_proxy : EventLoopProxy<InterfaceMessage>
+    event_proxy: EventLoopProxy<InterfaceMessage>,
 }
 
 impl InterfaceRunner {
-    fn new(event_proxy: EventLoopProxy<InterfaceMessage>, main_rx: UnboundedReceiver<InterfaceControl>) -> InterfaceRunner {
+    fn new(
+        event_proxy: EventLoopProxy<InterfaceMessage>,
+        main_rx: UnboundedReceiver<InterfaceControl>,
+    ) -> InterfaceRunner {
         InterfaceRunner {
-            showing : true,
-            tray : tray::start(),
-            config : config::new(),
-            config_open : false,
-            key_rx : winky::listen(),
+            showing: true,
+            tray: tray::start(),
+            config: config::new(),
+            config_open: false,
+            key_rx: winky::listen(),
             main_rx,
-            event_proxy
+            event_proxy,
         }
     }
 
     fn show_cross(&mut self) {
-        self.event_proxy.send_event(InterfaceMessage::ShowCross).unwrap();
+        self.event_proxy
+            .send_event(InterfaceMessage::ShowCross)
+            .unwrap();
         self.tray.on();
         self.showing = true;
     }
 
     fn hide_cross(&mut self) {
-        self.event_proxy.send_event(InterfaceMessage::HideCross).unwrap();
+        self.event_proxy
+            .send_event(InterfaceMessage::HideCross)
+            .unwrap();
         self.tray.off();
         self.showing = false;
     }
 
     fn set_cross(&mut self, n: usize) {
-        self.event_proxy.send_event(InterfaceMessage::SetCross(n)).unwrap();   
+        self.event_proxy
+            .send_event(InterfaceMessage::SetCross(n))
+            .unwrap();
     }
 
     fn toggle_cross(&mut self) {
-        if self.showing { self.hide_cross() } else { self.show_cross() }
+        if self.showing {
+            self.hide_cross()
+        } else {
+            self.show_cross()
+        }
     }
 
     fn toggle_config(&mut self) {
@@ -115,13 +128,12 @@ impl InterfaceRunner {
     }
 }
 
-
 enum InterfaceControl {
-    Quit
+    Quit,
 }
 
 pub struct Interface {
-    main_tx : UnboundedSender<InterfaceControl>,
+    main_tx: UnboundedSender<InterfaceControl>,
 }
 
 impl Interface {
@@ -136,7 +148,5 @@ pub fn start(event_proxy: EventLoopProxy<InterfaceMessage>) -> Interface {
         InterfaceRunner::new(event_proxy, main_rx).listen().await;
     });
 
-    Interface {
-        main_tx
-    }
+    Interface { main_tx }
 }

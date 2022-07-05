@@ -1,15 +1,15 @@
-use std::sync::RwLock;
-use state::Storage;
-use tokio::sync::broadcast;
-use serde::{Serialize, Deserialize};
 use directories::ProjectDirs;
+use serde::{Deserialize, Serialize};
+use state::Storage;
+use std::sync::RwLock;
+use tokio::sync::broadcast;
 
 static SETTINGS: Storage<RwLock<Settings>> = Storage::new();
 static SETTINGS_CHANNEL: Storage<broadcast::Sender<()>> = Storage::new();
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
-    pub crosshair : usize,
+    pub crosshair: usize,
 }
 
 fn get_config_dir() -> std::path::PathBuf {
@@ -30,9 +30,7 @@ fn load() -> Settings {
     }
 
     println!("No saved settings; using defaults");
-    Settings {
-        crosshair : 0,
-    }
+    Settings { crosshair: 0 }
 }
 
 fn save() {
@@ -56,7 +54,7 @@ fn save() {
 pub fn init() {
     let (tx, _rx) = broadcast::channel::<()>(4);
     SETTINGS_CHANNEL.set(tx);
-    SETTINGS.set(RwLock::new(load()));    
+    SETTINGS.set(RwLock::new(load()));
 }
 
 fn get_mut() -> std::sync::RwLockWriteGuard<'static, Settings> {
