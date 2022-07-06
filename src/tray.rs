@@ -2,6 +2,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tray_item::TrayItem;
 
 #[allow(unused)]
+#[derive(Copy, Clone)]
 pub enum TrayMessage {
     Show,
     Hide,
@@ -45,34 +46,20 @@ struct TrayRunner {
     control_rx: UnboundedReceiver<TrayControl>,
 }
 
+fn emitter(tx: &UnboundedSender<TrayMessage>, msg: TrayMessage) -> impl Fn() {
+    let tx_clone = tx.clone();
+    move || { let _ = tx_clone.send(msg); }
+}
+
 impl TrayRunner {
     async fn run(&mut self) {
         let mut tray = TrayItem::new("Verycross", "tray-on").unwrap();
         tray.add_label("Verycross").unwrap();
 
-        let show_tx = self.tray_tx.clone();
-        tray.add_menu_item("Show", move || {
-            let _ = show_tx.send(TrayMessage::Show);
-        })
-        .unwrap();
-
-        let hide_tx = self.tray_tx.clone();
-        tray.add_menu_item("Hide", move || {
-            let _ = hide_tx.send(TrayMessage::Hide);
-        })
-        .unwrap();
-
-        let config_tx = self.tray_tx.clone();
-        tray.add_menu_item("Config", move || {
-            let _ = config_tx.send(TrayMessage::Config);
-        })
-        .unwrap();
-
-        let quit_tx = self.tray_tx.clone();
-        tray.add_menu_item("Quit", move || {
-            let _ = quit_tx.send(TrayMessage::Quit);
-        })
-        .unwrap();
+        tray.add_menu_item("Show", emitter(&self.tray_tx, TrayMessage::Show)).unwrap();
+        tray.add_menu_item("Hide", emitter(&self.tray_tx, TrayMessage::Hide)).unwrap();
+        tray.add_menu_item("Config", emitter(&self.tray_tx, TrayMessage::Config)).unwrap();
+        tray.add_menu_item("Quit", emitter(&self.tray_tx, TrayMessage::Quit)).unwrap();
 
         while let Some(v) = self.control_rx.recv().await {
             match v {
