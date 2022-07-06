@@ -4,13 +4,8 @@ use std::sync::RwLock;
 use tokio::sync::broadcast;
 
 lazy_static! {
-    static ref SETTINGS: RwLock<Settings> = RwLock::new(
-        *load().coerce()
-    );
-    static ref SETTINGS_CHANNEL: broadcast::Sender<()> = {
-        let (tx, _rx) = broadcast::channel::<()>(4);
-        tx
-    };
+    static ref SETTINGS: RwLock<Settings> = RwLock::new(load());
+    static ref SETTINGS_CHANNEL: broadcast::Sender<()> = broadcast::channel::<()>(4).0;
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -25,12 +20,11 @@ impl Settings {
         }
     }
 
-    pub fn coerce(&mut self) -> &Settings {
+    pub fn coerce(&mut self) {
         if self.crosshair > 2 {
             println!("Settings: coercing crosshair to 0");
             self.crosshair = 0;
         }
-        self
     }
 }
 
@@ -40,7 +34,8 @@ fn get_config_dir() -> std::path::PathBuf {
 }
 
 fn get_config_filepath() -> std::path::PathBuf {
-    get_config_dir().join("settings.json")
+    let filename = if cfg!(debug_assertions) { "settings.debug.json" } else { "settings.json" };
+    get_config_dir().join(filename)
 }
 
 fn load() -> Settings {
@@ -67,7 +62,8 @@ fn save() {
     }
 
     let mut settings = *get_mut();
-    let serialized = serde_json::to_string(settings.coerce()).unwrap();
+    settings.coerce();
+    let serialized = serde_json::to_string(&settings).unwrap();
     if std::fs::write(get_config_filepath(), serialized).is_ok() {
         println!("Saved settings to disk");
     } else {
@@ -94,7 +90,5 @@ pub fn get() -> std::sync::RwLockReadGuard<'static, Settings> {
 
 pub fn set_crosshair(n: usize) {
     get_mut().crosshair = n;
-    // TODO: save to disk
-
     updated();
 }
