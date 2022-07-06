@@ -1,10 +1,7 @@
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-//use state::Storage;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
-
-use lazy_static::lazy_static;
 
 lazy_static! {
     static ref SETTINGS: RwLock<Settings> = RwLock::new(
