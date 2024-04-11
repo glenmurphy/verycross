@@ -4,7 +4,7 @@ use crate::tray;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
 use winit::event_loop::EventLoopProxy;
-use winky::Key;
+use winky::{Key, Event};
 
 #[derive(Debug, Clone, Copy)]
 pub enum InterfaceMessage {
@@ -20,7 +20,7 @@ struct InterfaceRunner {
     tray: tray::TrayInterface,
     config: config::ConfigInterface,
     config_open: bool,
-    key_rx: UnboundedReceiver<(Key, bool)>,
+    key_rx: UnboundedReceiver<Event>,
     main_rx: UnboundedReceiver<InterfaceControl>,
     event_proxy: EventLoopProxy<InterfaceMessage>,
 }
@@ -95,7 +95,7 @@ impl InterfaceRunner {
             tokio::select! {
                 Some(key_event) = self.key_rx.recv() => {
                     match key_event {
-                        (Key::ScrollLock, true) => self.toggle_cross(),
+                        Event::Keyboard(Key::ScrollLock, true) => self.toggle_cross(),
                         _ => {}
                     }
                 },

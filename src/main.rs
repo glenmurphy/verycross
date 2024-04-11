@@ -93,7 +93,7 @@ fn center_window(window: &Window) {
     let monitor_size = window.primary_monitor().unwrap().size();
     let window_size = window.inner_size();
     let x = (monitor_size.width - window_size.width) / 2;
-    let y = (monitor_size.height - window_size.height) / 2;
+    let y = (monitor_size.height - window_size.height) / 2 + 2;
     window.set_outer_position(PhysicalPosition::new(x, y));
 }
 
@@ -104,12 +104,24 @@ struct Image {
 }
 
 fn fill_window(image: &Image, window: &Window) {
-    let (width, height): (u32, u32) = window.inner_size().into();
-    let mut buffer = PixelBufferTyped::<NativeFormat>::new_supported(width, height, &window);
+    let (window_width, window_height): (i32, i32) = window.inner_size().into();
+    let mut buffer = PixelBufferTyped::<NativeFormat>::new_supported(window_width as u32, window_height as u32, &window);
+
+    let image_width = image.width as i32;
+    let image_height = image.height as i32;
+
+    let x_offset = (window_width - image_width) / 2;
+    let y_offset = (window_height - image_height) / 2;
 
     for (y, row) in buffer.rows_mut().enumerate() {
         for (x, pixel) in row.into_iter().enumerate() {
-            *pixel = image.buffer[(y * width as usize + x)];
+            let image_x = x as i32 - x_offset;
+            let image_y = y as i32 - y_offset;
+
+            if image_x >= 0 && image_x < image_width && image_y >= 0 && image_y < image_height {
+                let index = (image_y * image_width + image_x) as usize;
+                *pixel = image.buffer[index];
+            }
         }
     }
 
