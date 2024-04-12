@@ -1,5 +1,5 @@
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tray_item::TrayItem;
+use tray_item::{IconSource, TrayItem};
 
 #[allow(unused)]
 #[derive(Copy, Clone)]
@@ -53,18 +53,19 @@ fn emitter(tx: &UnboundedSender<TrayMessage>, msg: TrayMessage) -> impl Fn() {
 
 impl TrayRunner {
     async fn run(&mut self) {
-        let mut tray = TrayItem::new("Verycross", "tray-on").unwrap();
+        let mut tray = TrayItem::new("Verycross", IconSource::Resource("tray-on")).unwrap();
         tray.add_label("Verycross").unwrap();
 
         tray.add_menu_item("Show", emitter(&self.tray_tx, TrayMessage::Show)).unwrap();
         tray.add_menu_item("Hide", emitter(&self.tray_tx, TrayMessage::Hide)).unwrap();
+        tray.inner_mut().add_separator().unwrap(); // windows only
         tray.add_menu_item("Config", emitter(&self.tray_tx, TrayMessage::Config)).unwrap();
         tray.add_menu_item("Quit", emitter(&self.tray_tx, TrayMessage::Quit)).unwrap();
 
         while let Some(v) = self.control_rx.recv().await {
             match v {
-                TrayControl::On => tray.set_icon("tray-on").unwrap(),
-                TrayControl::Off => tray.set_icon("tray-off").unwrap(),
+                TrayControl::On => tray.set_icon(IconSource::Resource("tray-on")).unwrap(),
+                TrayControl::Off => tray.set_icon(IconSource::Resource("tray-off")).unwrap(),
                 TrayControl::Quit => {
                     let _ = tray.inner_mut().quit();
                     let _ = tray.inner_mut().shutdown();

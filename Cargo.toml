@@ -12,7 +12,7 @@ winit = "0.26.1"
 winapi = "0.3.9"
 winit-blit = { git = "https://github.com/rust-windowing/winit-blit" }
 png = "0.17.5"
-tray-item = "0.7.0"
+tray-item = "0.10.0"
 
 # Hotkey support
 winky = { path = './winky/' }
