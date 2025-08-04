@@ -7,7 +7,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-mod config;
 mod interface;
 mod settings;
 mod tray;

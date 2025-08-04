@@ -1,4 +1,3 @@
-use crate::config;
 use crate::settings;
 use crate::tray;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -18,8 +17,6 @@ pub enum InterfaceMessage {
 struct InterfaceRunner {
     showing: bool,
     tray: tray::TrayInterface,
-    config: config::ConfigInterface,
-    config_open: bool,
     key_rx: UnboundedReceiver<Event>,
     main_rx: UnboundedReceiver<InterfaceControl>,
     event_proxy: EventLoopProxy<InterfaceMessage>,
@@ -33,8 +30,6 @@ impl InterfaceRunner {
         InterfaceRunner {
             showing: true,
             tray: tray::start(),
-            config: config::new(),
-            config_open: false,
             key_rx: winky::listen(),
             main_rx,
             event_proxy,
@@ -71,17 +66,6 @@ impl InterfaceRunner {
         }
     }
 
-    fn toggle_config(&mut self) {
-        // Toggling doesn't really make UI sense, but we have it here so we can test
-        // our ability to communicate with the interior of the fltk window.
-        if self.config_open {
-            self.config.close();
-            self.config_open = false;
-        } else {
-            self.config.open();
-            self.config_open = true;
-        }
-    }
 
     fn quit(&mut self) {
         self.event_proxy.send_event(InterfaceMessage::Quit).unwrap();
@@ -103,16 +87,7 @@ impl InterfaceRunner {
                     match msg {
                         tray::TrayMessage::Show => self.show_cross(),
                         tray::TrayMessage::Hide => self.hide_cross(),
-                        tray::TrayMessage::Config => self.toggle_config(),
                         tray::TrayMessage::Quit => self.quit(),
-                    }
-                },
-                Some(msg) = self.config.recv() => {
-                    match msg {
-                        config::ConfigMessage::ShowCross => self.show_cross(),
-                        config::ConfigMessage::HideCross => self.hide_cross(),
-                        config::ConfigMessage::SetCross(x) => self.set_cross(x),
-                        config::ConfigMessage::ConfigClosed => self.config_open = false,
                     }
                 },
                 Some(msg) = self.main_rx.recv() => {
@@ -121,7 +96,7 @@ impl InterfaceRunner {
                     }
                 },
                 Ok(_) = settings_rx.recv() => {
-                    self.config.settings_changed();
+                    // Settings changed, but no config window to update
                 }
             }
         }

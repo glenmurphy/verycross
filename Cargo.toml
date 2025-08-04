@@ -17,9 +17,6 @@ tray-item = "0.10.0"
 # Hotkey support
 winky = { path = './winky/' }
 
-# Config window
-fltk = { version = "1.5.1", features = ["fltk-bundled"] }
-
 # Settings
 lazy_static = "1.4.0"
 serde = { version = "1.0.215", features = ["derive"] }
