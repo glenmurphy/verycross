@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.43.1", features = ["rt-multi-thread", "time", "macros", "sync"] }
-bumpalo = "3.11.1"
 single-instance = "0.3.3"
 winit = "0.26.1"
 winapi = "0.3.9"
